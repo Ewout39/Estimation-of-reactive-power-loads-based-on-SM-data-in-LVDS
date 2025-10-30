@@ -237,6 +237,42 @@ function find_voltage_source_branch_bus(math)
     return error()
 end
 
+function remove_excess_loads(data_or::Dict, good_buildings)
+    data = deepcopy(data_or)
+    loads_wanted = 2*length(good_buildings)
+    loads_to_remove = length(data["load"])-loads_wanted
+    loads_to_delete = []
+    branches_to_delete = []
+    if loads_to_remove <= 0
+        return data
+    else
+        for (id, load) in data["load"]
+            if load["load_bus"] in [57, 21, 33, 32]
+                push!(loads_to_delete, id)
+            end
+        end
+        for id in loads_to_delete
+            delete!(data["load"], id)
+        end
+        for (id, branch) in data["branch"]
+            if branch["f_bus"] in [57, 21, 33, 32, 6, 41, 22] || branch["t_bus"] in [57, 21, 33, 32, 6, 41, 22]
+                push!(branches_to_delete, id)
+            end
+        end
+        for id in branches_to_delete
+            delete!(data["branch"], id)
+        end
+        delete!(data["bus"], "57")
+        delete!(data["bus"], "21")
+        delete!(data["bus"], "33")
+        delete!(data["bus"], "32")
+        delete!(data["bus"], "6")
+        delete!(data["bus"], "41")
+        delete!(data["bus"], "22")
+    end
+    return data
+end
+
 function clean_4w_data!(ntw::Dict,  profiles_df::_DF.DataFrame;eng::Dict=Dict{String, Any}(), good_buildings, merge_buses_diff_linecodes::Bool = false)
     if merge_buses_diff_linecodes 
         remove_all_superfluous_buses!(ntw) 
@@ -267,102 +303,130 @@ end
 function assign_load_to_parquet_id!(data::Dict, df::_DF.DataFrame, good_buildings)
     parquet_ids = names(df)
     count = 1
+    Random.seed!(1)
+    random_list = rand(1:3, length(good_buildings))
     for (_, load) in data["load"]
         if split(parquet_ids[count], "_")[1] == "PLoad"
             load["parquet_id"] = split(parquet_ids[count], "_")[end]
             load["original"] = good_buildings[count]
+            load["phase_connections"] = random_list[count]
         end
         count+=1
     end
     return data
 end
 
-function insert_P_profiles!(data, df, df_PV, timestep, alpha) #data = math, df = load_profiles, timestep = j
+
+function insert_P_profiles!(data, df, df_PV, timestep, alpha, power_mult::Float64=1.0) #data = math, df = load_profiles, timestep = j
     power_unit = data["settings"]["sbase"]
     @assert power_unit == 1e5 "The profiles are in kW, but the power_unit seems different. Please fix."
     for (_, load) in data["load"]
-        load["connections"] = [1, 2, 3, 4]  # Ensure the load is connected to all phases
-        load["pd"] = zeros(3)
-        p_id = load["parquet_id"]
-        tuple1 = df[timestep, "PLoad_"*p_id]
-        load["pd"][1] = tuple1[1]/power_unit
-        load["pd"][2] = tuple1[2]/power_unit
-        if p_id == "25"
-            load["pd"][3] = (tuple1[3] - df_PV[timestep, "P_pv_3"].*alpha)/power_unit
+        if p_id >= 27
+            p_id = load["parquet_id"] - 26
         else
-            load["pd"][3] = tuple1[3]/power_unit
+            p_id = load["parquet_id"]
         end
-        #load["qd"] = [df[timestep, "QLoad_"*p_id]/power_unit]
+        load1 = df[timestep, "PLoad_"*p_id]
+        load["connections"] = [load["phase_connections"], 4]
+        load["pd"][1] = load1/power_unit*power_mult
+        #if p_id in ["1", "9", "4", "18", "24", "21", "2", "26", "20"]
+        #    load["pd"][1] = (load1*power_mult - df_PV[timestep, "P_pv_3"]*alpha)/power_unit
+            #println("original:", tuple1[3], "PV:", df_PV[timestep, "P_pv_3"]*alpha, "new:", load["pd"][3]*power_unit)
+        #end
     end
 end
 
-function insert_Q_profiles!(data, df, timestep, Q_set, season) #data = math, df = load_profiles, timestep = j, Q_setpoint: 0 = 0.95, 1 = custom,  2 = measured
+function insert_Q_profiles_usa!(data, df, timestep, Q_set, df_PV, df_PV_P, season, alpha, power_mult::Float64=1.0) #data = math, df = load_profiles, timestep = j, Q_setpoint: 0 = 0.95, 1 = custom,  2 = measured
     power_unit = data["settings"]["sbase"]
     @assert power_unit == 1e5 "The profiles are in kW, but the power_unit seems different. Please fix."
+    #alpha/=3
     for (_, load) in data["load"]
-        load["qd"] = zeros(3)
-        p_id = load["parquet_id"]
+        if p_id >= 27
+            p_id = load["parquet_id"] - 26
+        else
+            p_id = load["parquet_id"]
+        end
         if Q_set == 2
-            tuple1 = df[timestep, "QLoad_"*p_id]
+            Q_load1 = df[timestep, "QLoad_"*p_id]
         elseif Q_set == 0
-            tuple1 = df[timestep, "PLoad_"*p_id].*tan(acos(0.95))
+            Q_load1 = df[timestep, "PLoad_"*p_id].*tan(acos(0.95))
         elseif Q_set == 1
             if season == "Summer"
-                if load["original"] in ["3", "5", "8", "9", "11", "12", "15", "16", "18", "21", "26", "27", "28", "33", "35", "38"]
-                    tuple1 = df[timestep, "PLoad_"*p_id].*tan(acos(0.99))
-                elseif load["original"] in ["4", "7", "10", "19", "20", "30", "32", "36", "39"]
-                    tuple1 = df[timestep, "PLoad_"*p_id].*tan(acos(0.99))
-                elseif load["original"] in ["14", "22", "23", "29", "34"]
-                    tuple1 = df[timestep, "PLoad_"*p_id].*tan(acos(1))
+                if load["original"] in ["1", "2", "3", "4", "5", "6", "7", "9", "13", "26"]
+                    PF = 0.98
+                elseif load["original"] in ["8", "11", "12", "14", "16", "18", "24", "25"]
+                    PF = 0.99
+                elseif load["original"] in ["10", "15", "17", "19", "20", "21", "22", "23"]
+                    PF = 1.0
                 end
             elseif season == "Autumn"
-                if load["original"] in ["5", "8", "20", "22", "34", "39"]
-                    tuple1 = df[timestep, "PLoad_"*p_id].*tan(acos(1))
-                elseif load["original"] in ["3", "7", "11", "12", "18", "19", "23", "28", "30", "32", "35", "36", "15", "33"]
-                    tuple1 = df[timestep, "PLoad_"*p_id].*tan(acos(0.96))
-                elseif load["original"] in ["4", "9", "10", "14", "16", "21", "26", "27", "29", "38"]
-                    tuple1 = df[timestep, "PLoad_"*p_id].*tan(acos(0.9))
+                if load["original"] in ["6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "18", "19", "20", "21", "24", "25", "17", "22", "23"]
+                    PF = 1.0
+                elseif load["original"] in ["1", "2", "3", "4", "5", "26"]
+                    PF = 0.99
                 end
             elseif season == "Winter"
-                if load["original"] in ["5", "11", "15", "20", "30", "32", "34", "35", "36", "39", "14", "22", "28", "29", "33"]
-                    tuple1 = df[timestep, "PLoad_"*p_id].*tan(acos(1))
-                elseif load["original"] in ["4", "16", "21", "23", "26", "27"]
-                    tuple1 = df[timestep, "PLoad_"*p_id].*tan(acos(0.98))
-                elseif load["original"] in ["3", "12", "18", "19", "9", "10", "38"]
-                    tuple1 = df[timestep, "PLoad_"*p_id].*tan(acos(0.88))
-                elseif load["original"] in ["7", "8"]
-                    tuple1 = df[timestep, "PLoad_"*p_id].*tan(acos(0.97))
+                if load["original"] in ["10", "11", "12", "14", "16", "17", "1", "2", "3", "4", "5", "13", "21", "6", "7", "8", "9", "15", "18", "19", "20", "24", "25", "22", "23"]
+                    PF = 1.0
+                elseif load["original"] in ["26"]
+                    PF = 0.99
                 end
             elseif season == "Spring"
-                if load["original"] in ["4", "14", "16", "18", "20", "22", "32", "33", "35", "39"]
-                    tuple1 = df[timestep, "PLoad_"*p_id].*tan(acos(1))
-                elseif load["original"] in ["3", "7", "8", "9", "11", "12", "19", "23", "26", "27", "28", "30", "36"]
-                    tuple1 = df[timestep, "PLoad_"*p_id].*tan(acos(0.9))
-                elseif load["original"] in ["10", "15", "21", "29", "38"]
-                    tuple1 = df[timestep, "PLoad_"*p_id].*tan(acos(0.88))
-                elseif load["original"] in ["5", "34"]
-                    tuple1 = df[timestep, "PLoad_"*p_id].*tan(acos(0.99))
+                if load["original"] in  ["6", "8", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "24", "25", "22", "23"]
+                    PF = 1.0
+                elseif load["original"] in ["1", "2", "3", "4", "5", "7", "9", "26"]
+                    PF = 0.99
                 end
-            end 
+            end
+            Q_load1 = df[timestep, "PLoad_"*p_id].*tan(acos(PF))
         end
-        if tuple1 === nothing
-            error("No matching tuple assignment for load $(load["original"]) in season $season and Q_set $Q_set")
-        end
-        load["qd"][1] = tuple1[1]/power_unit
-        load["qd"][2] = tuple1[2]/power_unit
-        load["qd"][3] = tuple1[3]/power_unit
+        #if p_id in ["1", "9", "4", "18", "24", "21", "2", "26", "20"] && Q_set == 2
+        #    load["qd"][1] = (Q_load1*power_mult + df_PV[timestep, "Q_pv_3"].*alpha)/power_unit
+        #elseif p_id in ["1", "9", "4", "18", "24", "21", "2", "26", "20"] && Q_set == 0
+        #    load["qd"][1] = (Q_load1*power_mult + df_PV_P[timestep, "P_pv_3"].*tan(acos(0.95)).*alpha)/power_unit
+        #elseif p_id in ["1", "9", "4", "18", "24", "21", "2", "26", "20"] && Q_set == 1
+        #    if season == "Summer"
+        #        load["qd"][1] = (Q_load1*power_mult + df_PV_P[timestep, "P_pv_3"].*tan(acos(PF)).*alpha)/power_unit
+        #    elseif season == "Autumn"
+        #        load["qd"][1] = (Q_load1*power_mult + df_PV_P[timestep, "P_pv_3"].*tan(acos(PF)).*alpha)/power_unit
+        #    elseif season == "Winter"
+        #        load["qd"][1] = (Q_load1*power_mult + df_PV_P[timestep, "P_pv_3"].*tan(acos(PF)).*alpha)/power_unit
+        #    elseif season == "Spring"
+        #        load["qd"][1] = (Q_load1*power_mult + df_PV_P[timestep, "P_pv_3"].*tan(acos(PF)).*alpha)/power_unit
+        #    end
+        #else
+        load["qd"][1] = Q_load1/power_unit*power_mult
+        #end
     end
 end
 
+function add_initial_values!(math, result)
+    for (key, bus) in math["bus"]
+        vr = result["solution"]["bus"]["$key"]["vr"]
+        vi = result["solution"]["bus"]["$key"]["vi"]
+        bus["vr_start"] = vr
+        bus["vi_start"] = vi
+    end
+end    
+
 function pf_solution_to_line_loading!(sol::Dict, math::Dict)
-    I_base = math["settings"]["sbase"]/(math["settings"]["vbases_default"]["54"])  # in kA
     for (i, line) in sol["solution"]["branch"]
-        line_from = sqrt.( (line["cr"][1:4]).^2 + (line["ci"][1:4]).^2 ).*I_base
-        line_to = sqrt.( (line["cr"][5:8]).^2 + (line["ci"][5:8]).^2 ).*I_base
-        #line_loading = maximum(vcat(line_from, line_to)) #This is wrong needs to be fixed
-        line_loading = line_from
+        bus = math["branch"]["$(i)"]["f_bus"]
+        um = sqrt.(sol["solution"]["bus"]["$(bus)"]["vr"][1:4].^2 .+ sol["solution"]["bus"]["$(bus)"]["vi"][1:4].^2)
+        ua = atan.(sol["solution"]["bus"]["$(bus)"]["vi"][1:4] ./ sol["solution"]["bus"]["$(bus)"]["vr"][1:4])
+        uf = um .* exp.(1im .* ua)
+        if haskey(line, "cr") && haskey(line, "ci")
+            i_f = line["cr"][1:4] .+ 1im .* line["ci"][1:4]
+            sf = uf.*conj(i_f)
+            pf = real.(sf)
+            qf = imag.(sf)
+        else
+            pf = line["pf"][1:4]
+            qf = line["qf"][1:4] 
+        end
+        line_loading = sqrt.(pf.^2 .+ qf.^2).*math["settings"]["sbase"]./(abs.(uf).*math["settings"]["vbases_default"]["54"])
         if math["branch"][i]["linecode"] == "pluto" || math["branch"][i]["linecode"] == "hydrogen"
-            ampacity = 437.0
+            ampacity = 600  #437, but actually should be 600 Amps 600 ~= 437/0.75
         elseif math["branch"][i]["linecode"] == "ABC2x16"
             ampacity = 78.0
         elseif math["branch"][i]["linecode"] == "TW2X16"
@@ -374,3 +438,23 @@ function pf_solution_to_line_loading!(sol::Dict, math::Dict)
         sol["solution"]["branch"][i]["line_loading"] = line_loading./ampacity
     end
 end
+
+#function add_PV_index!(math)
+#    for (key, values) in math["load"]
+#        if values["parquet_id"] in ["1", "9", "4", "18", "24", "21", "2", "26", "20"]
+#            math["load"][key]["has_PV"] = true
+#        else
+#            math["load"][key]["has_PV"] = false
+#        end
+#    end
+#end
+
+#for (key, values) in math["load"]
+#    if math["load"][key]["parquet_id"] in ["1", "9", "4", "18", "24", "21", "2", "26", "20"]
+#        println("load", key, "load_bus", math["load"][key]["load_bus"], "parquet_id", math["load"][key]["parquet_id"], "connections", math["load"][key]["connections"])
+#    end
+#end
+
+#for (key, values) in math["load"]
+#    println(math["load"][key]["connections"])
+#end
