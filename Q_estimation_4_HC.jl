@@ -9,6 +9,8 @@ using CSV
 using Random
 using Statistics
 using LinearAlgebra
+using LaTeXStrings
+using Colors
 include("network_functions.jl")
 include("load_data.jl")
 include("Visualization.jl")
@@ -20,30 +22,33 @@ good_buildings, load_profiles, PV_profile, PV_profile_Q = extract_loading_usa!()
 eng = _PMD.parse_file("Master_oh.dss", data_model = _PMD.ENGINEERING, transformations=[_PMD.transform_loops!,_PMD.remove_all_bounds!])
 rm_transformer!(eng)
 reduce_enwl_lines_eng!(eng)
-eng["settings"]["sbase_default"] = 100000
-math1 = _PMD.transform_data_model(eng, kron_reduce=false, phase_project=false)
-math = remove_excess_loads(math1, good_buildings)
+eng["settings"]["sbase_default"] = 10000
+math = _PMD.transform_data_model(eng, kron_reduce=false, phase_project=false)
+#math = remove_excess_loads(math1, good_buildings)
 clean_4w_data!(math, load_profiles, eng=eng, good_buildings=good_buildings, merge_buses_diff_linecodes = false)
-add_PV_index!(math)
 add_linecode_math!(math, eng)
-powerplot(math, width=1000, height = 1000, bus=(:size=>200))
+topology = powerplot(math, width=800, height = 600, bus=(:size=>100, :color=>:gray), load=(:size=>200, :color=>:black), branch=(:color=>:gray), gen=(:size=>300, :color=>:darkred))
+
+save("C:\\Users\\ewout\\OneDrive - KU Leuven\\PHD\\Papers\\paper_thesis\\result_figures\\network_topology.pdf", topology)
+#save("C:\\Users\\u0181580\\OneDrive - KU Leuven\\PHD\\Papers\\paper_thesis\\result_figures\\network_topology.pdf", topology)
 
 #Hosting Capacity analysis (for different Q setpoints)
-alpha_range = [1, 70, 72, 74, 76, 78]
-season = "Winter"
+alpha_range = [6]
+season = "Summer"
 rep_month_start, rep_month_end, rep_month = network_rep_month(season, load_profiles, good_buildings)
 power_mult = 1.0
 Result_dict = initialize_empty_dict!()
-function hosting_capacity_analysis!(math, load_profiles, PV_profile, alpha_range,  rep_month_start::Int64, rep_month_end::Int64, Q_setpoint::Int64=2, season::String="Summer", Q_Z::String="Q", Z_value::Float64=1.0, power_mult::Float64=1.0)
-    timesteps_range = rep_month_start:rep_month_end
+function hosting_capacity_analysis!(math, load_profiles, PV_profile, alpha_range, EV_load, rep_month_start::Int64, rep_month_end::Int64, Q_setpoint::Int64=2, season::String="Summer", Q_Z::String="Q", Z_value::Float64=1.0, power_mult::Float64=1.0)
+    #timesteps_range = rep_month_start:rep_month_end
+    timesteps_range = 1:24
     for alpha in alpha_range
         new_alpha_v = 1
         new_alpha_ll = 1
         println("Starting analysis for alpha = $alpha, Q_setpoint = $Q_setpoint and Z_value = $Z_value")
         _PMD.add_start_vrvi!(math)
         for timestep in timesteps_range
-            insert_P_profiles!(math, load_profiles, PV_profile, timestep, alpha, power_mult)
-            insert_Q_profiles_usa!(math, load_profiles, timestep, Q_setpoint, PV_profile_Q, PV_profile, season, alpha, power_mult)
+            insert_P_profiles!(math, load_profiles, timestep, alpha, EV_load, power_mult)
+            insert_Q_profiles_usa!(math, load_profiles, timestep, Q_setpoint, season, alpha, power_mult)
             res = _PMD.solve_mc_opf(math, _PMD.IVRENPowerModel, optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 2000, "print_level" => 0))
             pf_solution_to_line_loading!(res, math)
             if res["termination_status"] == _PMD.OTHER_ERROR
@@ -114,11 +119,18 @@ end
 
 #Hosting capacity analysis for different Z values
 Result_dict1 = initialize_empty_dict!()
-Result_dict2 = initialize_empty_dict!()
-season = "Autumn"
+season = "Summer"
 rep_month_start, rep_month_end, rep_month = network_rep_month(season, load_profiles, good_buildings)
-power_mult = 1.0
-Z_range = [1.4] #R = 1.4, X = 1 works, alpha = 50 for summer, 60 for winter, 60 for spring
+power_mult = 5.0
+Z_range = [1.6]
+Nr_EVs = 15
+
+EV_load = select_EV_loads(math, Nr_EVs)
+
+for load in EV_load
+    phase = math["load"][load]["connections"][1]
+    println("Selected EV load: $load on phase $phase")
+end
 
 for Q_setpoint in [0, 1, 2]
     for Z_value in Z_range
@@ -127,41 +139,53 @@ for Q_setpoint in [0, 1, 2]
             br_r = branch["br_r"]
             br_x = branch["br_x"]
             math2["branch"][key]["br_r"] = br_r .*Z_value
-            math2["branch"][key]["br_x"] = br_x 
+            math2["branch"][key]["br_x"] = br_x .*Z_value
         end
-        hosting_capacity_analysis!(math2, load_profiles, PV_profile, [60], rep_month_start, rep_month_end, Q_setpoint, season, "Z", Z_value, power_mult)
+        hosting_capacity_analysis!(math2, load_profiles, PV_profile, [4], EV_load, rep_month_start, rep_month_end, Q_setpoint, season, "Z", Z_value, power_mult)
     end
 end
 
-#Temporary code for debugging
-timestamp_test = 20499
-_PMD.add_start_vrvi!(math)
-insert_P_profiles!(math, load_profiles, PV_profile, timestamp_test, 77, power_mult)
-insert_Q_profiles_usa!(math, load_profiles, timestamp_test, 1, PV_profile_Q, PV_profile, season, 77, power_mult)
-res = _PMD.solve_mc_opf(math, _PMD.IVRENPowerModel, optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 800))
 
-hosting_capacity_analysis!(math, load_profiles, PV_profile, [72], rep_month_start, rep_month_end, 2, season, "Q", 1.0, power_mult)
 
 #Visualization of the results
-visualization_same_bus_diff_alpha(Result_dict, season, "1", 11, alpha_range)
-visualization_effect_of_Q_setpoint(Result_dict, season, 11, 78)
-visualization_of_bus_voltages(Result_dict, season, 76, "1")
-visualization_of_loads(Result_dict, season, "1", 18, 70, math)  #requires the load key from math (not the parquet_id or the original load index)
+visualization_same_bus_diff_alpha(Result_dict, season, "0", 65, alpha_range)
+visualization_effect_of_Q_setpoint(Result_dict, season, 65, 5)
+visualization_of_bus_voltages(Result_dict, season, 6, "0")
+visualization_of_loads(Result_dict, season, "0", 20, 6, math)  #requires the load key from math (not the parquet_id or the original load index)
 visualization_of_Q_loads(Result_dict, season, "1", 18, 70, math)
 slack_line, slack_bus = find_slack_line(math)
 visualization_of_line_loading(Result_dict, season, string(slack_line), 76)
 
-Season = "Autumn"
+Season = "Summer"
 visualization_effect_Z_line(Result_dict1, Season, string(slack_line), "2", Z_range)
 visualization_effect_of_Z_voltage(Result_dict1, Season, 11, "0", Z_range)
-visualization_effect_of_Q_Z(Result_dict1, Season, "1.4", 11, "60")
-visualization_of_loads_Z(Result_dict1, Season, "1", 24, 54, 1.4, math)
+visualization_effect_of_Q_Z(Result_dict1, Season, "1.6", 56, 2) # Area 1 = bus 66, Area 2 = bus 56, Area 3 = bus 100
+visualization_of_loads_Z(Result_dict1, Season, "1", 19, 3, 1.5, math)
 visualization_of_Q_loads_Z(Result_dict1, Season, "0", 26, 54, 1.4, math)
 visualization_of_line_loading_Z(Result_dict1, Season, string(slack_line), 60, 1.4)
+min_max_differences(Result_dict1, Season, 100, "1.6")
 
 
-PV_winter = PV_profile[2997:5665,:P_pv_3]
-PV_summer = PV_profile[20353:23621,:P_pv_3]
-
-plot(PV_winter, label="Winter PV Profile", xlabel="Time step", ylabel="PV Power (kW)", title="PV Power Profile Winter")
-plot(PV_summer, label="Summer PV Profile", xlabel="Time step", ylabel="PV Power (kW)", title="PV Power Profile Summer")
+phase_1 = 0
+phase_2 = 0
+phase_3 = 0
+power_phase_1 = 0.0
+power_phase_2 = 0.0
+power_phase_3 = 0.0
+for (key, load) in math["load"]
+    p_id = load["parquet_id"]
+    load1 = sum(load_profiles[:, "PLoad_"*p_id].*4)/(8760)
+    if load["connections"][1] == 1
+        power_phase_1 += load1
+        phase_1 += 1
+    elseif load["connections"][1] == 2
+        power_phase_2 += load1
+        phase_2 += 1
+    elseif load["connections"][1] == 3
+        power_phase_3 += load1
+        phase_3 += 1
+    end
+end
+println("Load on phases: P1 = $(phase_1), P2 = $(phase_2), P3 = $(phase_3)")
+println("Total loads:", phase_1 + phase_2 + phase_3)
+println("Total power on phases: P1 = $(power_phase_1) kW, P2 = $(power_phase_2) kW, P3 = $(power_phase_3) kW")

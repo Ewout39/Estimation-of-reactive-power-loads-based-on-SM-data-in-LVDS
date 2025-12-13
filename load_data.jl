@@ -52,7 +52,8 @@ end
 
 function extract_loading_usa!()
     loaded_data = Dict{Int, Any}()
-    filepath1 = "C:\\Users\\ewout\\OneDrive - KU Leuven\\2e_master\\thesis\\datasets\\dataset German household\\repository\\2019_data_15min.hdf5"
+    #filepath1 = "C:\\Users\\ewout\\OneDrive - KU Leuven\\2e_master\\thesis\\datasets\\dataset German household\\repository\\2019_data_15min.hdf5"
+    filepath1 =  "C:\\Users\\u0181580\\OneDrive - KU Leuven\\2e_master\\thesis\\datasets\\dataset German household\\repository\\2019_data_15min.hdf5"
     loaded_data_PV = h5open(filepath1, "r") do file
     read(file)
     end
@@ -62,13 +63,21 @@ function extract_loading_usa!()
                 PV_prod[j, "P_pv_3"] = (loaded_data_PV["WITH_PV"]["SFH33"]["HOUSEHOLD"]["table"][j][:P_TOT]/1000 - loaded_data_PV["WITH_PV"]["SFH33"]["HOUSEHOLD"]["table"][j][:P_TOT_WITH_PV]/1000)/2
                 PV_prod_Q[j, "Q_pv_3"] = PV_prod[j, "P_pv_3"] .* tan(acos(0.97)) #Strong effect on results
     end
-    good_buildings = ["$(i)" for i in 1:26]
+    good_buildings = ["$(i)" for i in 1:55]
     column_names_P = ["PLoad_$(i)" for i in 1:length(good_buildings)]
     column_names_Q = ["QLoad_$(i)" for i in 1:length(good_buildings)]
     column_names = vcat(column_names_P, column_names_Q)
     load_data = _DF.DataFrame((column_name => [0.0 for _ in 1:35040] for column_name in column_names)...)
-    for i in 1:26
-        filepath = "C:\\Users\\ewout\\OneDrive - KU Leuven\\2e_master\\thesis\\datasets\\MFRED USA dataset\\Code_data\\powerdf_clean_test\\$(i).csv"
+    for i in 1:55
+        if i >= 27 && i <= 52
+            k = i - 26
+        elseif i >= 53
+            k = i -52
+        else
+            k = i
+        end
+        #filepath = "C:\\Users\\ewout\\OneDrive - KU Leuven\\2e_master\\thesis\\datasets\\MFRED USA dataset\\Code_data\\powerdf_clean_test\\$(k).csv"
+        filepath = "C:\\Users\\u0181580\\OneDrive - KU Leuven\\2e_master\\thesis\\datasets\\MFRED USA dataset\\Code_data\\powerdf_clean_test\\$(k).csv"
         data = CSV.read(filepath, _DF.DataFrame, delim=',')
         loaded_data[i] = data
         for j in 1:35040

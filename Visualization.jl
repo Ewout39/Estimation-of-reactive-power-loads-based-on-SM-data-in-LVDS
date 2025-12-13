@@ -3,7 +3,7 @@ function visualization_same_bus_diff_alpha(Result_dict, season, Q_set, bus, rang
     p1 = nothing
     p2 = nothing
     p3 = nothing
-    range = 300:400
+    range = 100:772
     for alpha in alphas
         v1 = Result_dict[Q_set][season]["Alpha=$(alpha)"]["Busses"]["$(bus)"]["V1"][range]
         v2 = Result_dict[Q_set][season]["Alpha=$(alpha)"]["Busses"]["$(bus)"]["V2"][range]
@@ -38,7 +38,7 @@ function visualization_effect_of_Q_setpoint(Result_dict, season, bus, alpha)
             p1 = plot(v1, label="Phase 1, Q_set=$(Q_set)", xlabel="Time step", ylabel="Voltage Magnitude (p.u.)", title="Voltage Magnitude at Bus $(bus) for alpha $(alpha)", legend=:topright)
             p2 = plot(v2, label="Phase 2, Q_set=$(Q_set)", xlabel="Time step", ylabel="Voltage Magnitude (p.u.)", title="Voltage Magnitude at Bus $(bus) for alpha $(alpha)", legend=:topright)
             p3 = plot(v3, label="Phase 3, Q_set=$(Q_set)", xlabel="Time step", ylabel="Voltage Magnitude (p.u.)", title="Voltage Magnitude at Bus $(bus) for alpha $(alpha)", legend=:topright)
-            violation_indicator = [v > 1.1 ? 1 : 0 for v in v1]
+            violation_indicator = [v < 0.9 ? 1 : 0 for v in v1]
             p1_sub = plot(violation_indicator, color=:red, fillto=0, fillcolor=:red, alpha=0.3, yticks=[0, 1], ylims=(-0.1, 1.1), legend=false, bar_width = 1)
         else
             plot!(p1, v1, label="Phase 1, Q_set=$(Q_set)")
@@ -46,7 +46,7 @@ function visualization_effect_of_Q_setpoint(Result_dict, season, bus, alpha)
             plot!(p3, v3, label="Phase 3, Q_set=$(Q_set)")
         end
     end
-    hline!(p1, [1.1], color=:red, label="")
+    hline!(p1, [0.9], color=:red, label="")
     combined_plot = plot(p1, p1_sub, layout=@layout([a{0.9h}; b{0.1h}]), size=(800, 600))
     display(combined_plot)
     display(p2)
@@ -85,7 +85,7 @@ end
 
 function visualization_of_loads(Result_dict, season, Q_set, load, alpha, math)
     #range = 1:length(Result_dict[Q_set][season]["Alpha=$(alpha)"]["Loads"]["$(load)"]["P1"])
-    range = 1:672
+    range = 1345:2016
     p1 = Result_dict[Q_set][season]["Alpha=$(alpha)"]["Loads"]["$(load)"]["P$(math["load"]["$(load)"]["phase_connections"])"][range].*math["settings"]["sbase"]
     pl1 = plot(p1, label="Phase $(math["load"]["$(load)"]["phase_connections"])", xlabel="Time step", ylabel="Active Power (kW)", title="Active Power at Load $(load) for alpha $(alpha)", legend=:topright)
     display(pl1)
@@ -272,45 +272,190 @@ function visualization_effect_of_Z_voltage(Result_dict, season, bus, Q_set, Z_ra
     display(p3)
 end
 
-function visualization_effect_of_Q_Z(Result_dict, season, Z_value, bus, alpha)
+function visualization_effect_of_Q_Z(Result_dict, season, Z_value, bus, area)
     Q_sets = ["0", "1", "2"]
+    c_light = RGB(0.80, 0.80, 0.80)   # light gray
+    c_mid   = RGB(0.50, 0.50, 0.50)   # medium gray
+    c_dark  = RGB(0.20, 0.20, 0.20)   # dark gray
     p1 = nothing
     p2 = nothing
     p3 = nothing
     p1_sub = nothing
     p2_sub = nothing
     p3_sub = nothing
-    range = 100:772
+    #range = 673:1344
+    range = 2017:2688
     for Q_set in Q_sets
         v1 = Result_dict[Q_set][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V1"][range]
         v2 = Result_dict[Q_set][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V2"][range]
         v3 = Result_dict[Q_set][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V3"][range]
         if Q_set == Q_sets[1]
-            p1 = plot(v1, label="Phase 1, Q_set=$(Q_set)", xlabel="Time step", ylabel="Voltage Magnitude (p.u.)", title="Voltage Magnitude at Bus $(bus) for alpha $(alpha) in $(season)", legend=:topright)
-            p2 = plot(v2, label="Phase 2, Q_set=$(Q_set)", xlabel="Time step", ylabel="Voltage Magnitude (p.u.)", title="Voltage Magnitude at Bus $(bus) for alpha $(alpha) in $(season)", legend=:topright)
-            p3 = plot(v3, label="Phase 3, Q_set=$(Q_set)", xlabel="Time step", ylabel="Voltage Magnitude (p.u.)", title="Voltage Magnitude at Bus $(bus) for alpha $(alpha) in $(season)", legend=:topright)
+            p1 = plot(v1, color =c_light, label=L"PF~=~0.95", linestyle = :dot, linewidth = 2.0, xlabel=L"Time~step", ylabel=L"Voltage~Magnitude~(p.u.)", legend=:topright, legend_background_color=RGBA(1,1,1,0.85), legendfontsize = 20, guidefontsize =20, tickfontsize = 15, titlefontsize=20, yscale=:log10, yticks = ([0.9, 0.92, 0.94, 0.96, 0.98], [L"0.9", L"0.92", L"0.94", L"0.96", L"0.98"]), xticks = ([0, 96, 192, 288, 384, 480, 576], [L"0", L"24h", L"48h", L"72h", L"96h", L"120h", L"144h"]))
+            p2 = plot(v2, color =c_light, label=L"PF~=~0.95", linestyle = :dot, linewidth = 2.0, xlabel=L"Time~step", ylabel=L"Voltage~Magnitude~(p.u.)", legend_background_color=RGBA(1,1,1,0.85), legend=:topright, legendfontsize = 20, guidefontsize =20, tickfontsize = 15, titlefontsize=20, yscale=:log10, yticks = ([0.9, 0.92, 0.94, 0.96, 0.98], [L"0.9", L"0.92", L"0.94", L"0.96", L"0.98"]), xticks = ([0, 96, 192, 288, 384, 480, 576], [L"0", L"24h", L"48h", L"72h", L"96h", L"120h", L"144h"]))
+            p3 = plot(v3, color =c_light, label=L"PF~=~0.95", linestyle = :dot, linewidth = 2.0, xlabel=L"Time~step", ylabel=L"Voltage~Magnitude~(p.u.)", legend_background_color=RGBA(1,1,1,0.85), legend=:topright, legendfontsize = 20, guidefontsize =20, tickfontsize = 15, titlefontsize=20, yscale=:log10, yticks=([0.96, 0.97, 0.98, 0.99], [L"0.96", L"0.97", L"0.98", L"0.99"]), xticks = ([0, 96, 192, 288, 384, 480, 576], [L"0", L"24h", L"48h", L"72h", L"96h", L"120h", L"144h"]))
+            violation_indicator_1 = [v < 0.9 ? 1 : 0 for v in v1]
+            violation_indicator_2 = [v < 0.9 ? 1 : 0 for v in v2]
+            violation_indicator_3 = [v < 0.9 ? 1 : 0 for v in v3]
+            p1_sub = plot(violation_indicator_1, color=:red, fillto=0, fillcolor=:red, alpha=0.7, yticks=[0, 1], ylims=(-0.1, 1.1), legend=false, bar_width = 1, tickfontsize = 15, xticks = ([0, 96, 192, 288, 384, 480, 576], [L"0", L"24h", L"48h", L"72h", L"96h", L"120h", L"144h"]))
+            p2_sub = plot(violation_indicator_2, color=:red, fillto=0, fillcolor=:red, alpha=0.7, yticks=[0, 1], ylims=(-0.1, 1.1), legend=false, bar_width = 1, tickfontsize = 15, xticks = ([0, 96, 192, 288, 384, 480, 576], [L"0", L"24h", L"48h", L"72h", L"96h", L"120h", L"144h"]))
+            p3_sub = plot(violation_indicator_3, color=:red, fillto=0, fillcolor=:red, alpha=0.7, yticks=[0, 1], ylims=(-0.1, 1.1), legend=false, bar_width = 1, tickfontsize = 15, xticks = ([0, 96, 192, 288, 384, 480, 576], [L"0", L"24h", L"48h", L"72h", L"96h", L"120h", L"144h"]))
         elseif Q_set == Q_sets[3]
-            violation_indicator_1 = [v > 1.1 ? 1 : 0 for v in v1]
-            violation_indicator_2 = [v > 1.1 ? 1 : 0 for v in v2]
-            violation_indicator_3 = [v > 1.1 ? 1 : 0 for v in v3]
-            p1_sub = plot(violation_indicator_1, color=:red, fillto=0, fillcolor=:red, alpha=0.3, yticks=[0, 1], ylims=(-0.1, 1.1), legend=false, bar_width = 1)
-            p2_sub = plot(violation_indicator_2, color=:red, fillto=0, fillcolor=:red, alpha=0.3, yticks=[0, 1], ylims=(-0.1, 1.1), legend=false, bar_width = 1)
-            p3_sub = plot(violation_indicator_3, color=:red, fillto=0, fillcolor=:red, alpha=0.3, yticks=[0, 1], ylims=(-0.1, 1.1), legend=false, bar_width = 1)
-            plot!(p1, v1, label="Phase 1, Q_set=$(Q_set)")
-            plot!(p2, v2, label="Phase 2, Q_set=$(Q_set)")
-            plot!(p3, v3, label="Phase 3, Q_set=$(Q_set)")
+            act_vio_ind_1 = [v < 0.9 ? 1 : 0 for v in v1]
+            act_vio_ind_2 = [v < 0.9 ? 1 : 0 for v in v2]
+            act_vio_ind_3 = [v < 0.9 ? 1 : 0 for v in v3]
+            plot!(p1_sub, act_vio_ind_1, color=:green, fillto=0, fillcolor=:green, alpha=0.7, yticks=[0, 1], ylims=(-0.1, 1.1), legend=false, bar_width = 1, tickfontsize = 15)
+            plot!(p2_sub, act_vio_ind_2, color=:green, fillto=0, fillcolor=:green, alpha=0.7, yticks=[0, 1], ylims=(-0.1, 1.1), legend=false, bar_width = 1, tickfontsize = 15)
+            plot!(p3_sub, act_vio_ind_3, color=:green, fillto=0, fillcolor=:green, alpha=0.7, yticks=[0, 1], ylims=(-0.1, 1.1), legend=false, bar_width = 1, tickfontsize = 15)
+            plot!(p1, v1, color =c_dark, linestyle = :dash,  label=L"Ground~truth", legendfontsize = 20, guidefontsize = 20, tickfontsize = 15)
+            plot!(p2, v2, color =c_dark, linestyle = :dash,  label=L"Ground~truth", legendfontsize = 20, guidefontsize = 20, tickfontsize = 15)
+            plot!(p3, v3, color =c_dark, linestyle = :dash,  label=L"Ground~truth", legendfontsize = 20, guidefontsize = 20, tickfontsize = 15)
         else
-            plot!(p1, v1, label="Phase 1, Q_set=$(Q_set)")
-            plot!(p2, v2, label="Phase 2, Q_set=$(Q_set)")
-            plot!(p3, v3, label="Phase 3, Q_set=$(Q_set)")
+            plot!(p1, v1, color=c_mid, linestyle = :solid, linewidth=2, label=L"Best~method", legendfontsize = 20, guidefontsize = 20, tickfontsize = 15)
+            plot!(p2, v2, color=c_mid, linestyle = :solid, linewidth=2, label=L"Best~method", legendfontsize = 20, guidefontsize = 20, tickfontsize = 15)
+            plot!(p3, v3, color=c_mid, linestyle = :solid, linewidth=2, label=L"Best~method", legendfontsize = 20, guidefontsize = 20, tickfontsize = 15)
         end
     end
-    hline!(p1, [1.1], color=:red, label="")
-    hline!(p2, [1.1], color=:red, label="")
-    hline!(p3, [1.1], color=:red, label="")
+    for Q_set in Q_sets
+        v1 = Result_dict[Q_set][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V1"][range]
+        v2 = Result_dict[Q_set][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V2"][range]
+        v3 = Result_dict[Q_set][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V3"][range]
+        if !all(v1 .> 0.9)
+            hline!(p1, [0.9], color=:red, label="")
+        end
+        if !all(v2 .> 0.9)
+            hline!(p2, [0.9], color=:red, label="")
+        end
+        if !all(v3 .> 0.9)
+            hline!(p3, [0.9], color=:red, label="")
+        end
+    end
     combined_plot_1 = plot(p1, p1_sub, layout=@layout([a{0.9h}; b{0.1h}]), size=(800, 600))
     combined_plot_2 = plot(p2, p2_sub, layout=@layout([a{0.9h}; b{0.1h}]), size=(800, 600))
     combined_plot_3 = plot(p3, p3_sub, layout=@layout([a{0.9h}; b{0.1h}]), size=(800, 600))
+    display(combined_plot_1)
+    display(combined_plot_2)
+    display(combined_plot_3)
+    savefig(combined_plot_1, "C:\\Users\\ewout\\OneDrive - KU Leuven\\PHD\\Papers\\paper_thesis\\result_figures\\Undervoltage_Violations_Bus_$(bus)_Area_$(area)_Phase_1_Z_$(Z_value).pdf")
+    savefig(combined_plot_2, "C:\\Users\\ewout\\OneDrive - KU Leuven\\PHD\\Papers\\paper_thesis\\result_figures\\Undervoltage_Violations_Bus_$(bus)_Area_$(area)_Phase_2_Z_$(Z_value).pdf")
+    savefig(combined_plot_3, "C:\\Users\\ewout\\OneDrive - KU Leuven\\PHD\\Papers\\paper_thesis\\result_figures\\Undervoltage_Violations_Bus_$(bus)_Area_$(area)_Phase_3_Z_$(Z_value).pdf")
+    #savefig(combined_plot_1, "C:\\Users\\u0181580\\OneDrive - KU Leuven\\PHD\\Papers\\paper_thesis\\result_figures\\Undervoltage_Violations_Bus_$(bus)_Area_$(area)_Phase_1_Z_$(Z_value).pdf")
+    #savefig(combined_plot_2, "C:\\Users\\u0181580\\OneDrive - KU Leuven\\PHD\\Papers\\paper_thesis\\result_figures\\Undervoltage_Violations_Bus_$(bus)_Area_$(area)_Phase_2_Z_$(Z_value).pdf")
+    #savefig(combined_plot_3, "C:\\Users\\u0181580\\OneDrive - KU Leuven\\PHD\\Papers\\paper_thesis\\result_figures\\Undervoltage_Violations_Bus_$(bus)_Area_$(area)_Phase_3_Z_$(Z_value).pdf")
+end
+
+function visualization_effect_of_Q_Z_1(Result_dict, season, Z_value, bus, area)
+    Q_sets = ["0", "1", "2"]
+    c_light = RGB(0.80, 0.80, 0.80)   # light gray
+    c_mid   = RGB(0.50, 0.50, 0.50)   # medium gray
+    c_dark  = RGB(0.20, 0.20, 0.20)   # dark gray
+
+    range = 2017:2688
+
+    # Initialize plots
+    p1_high = nothing; p2_high = nothing; p3_high = nothing
+    p1_low  = nothing; p2_low  = nothing; p3_low  = nothing
+    p1_sub  = nothing; p2_sub  = nothing; p3_sub  = nothing
+
+    for Q_set in Q_sets
+        v1 = Result_dict[Q_set][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V1"][range]
+        v2 = Result_dict[Q_set][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V2"][range]
+        v3 = Result_dict[Q_set][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V3"][range]
+
+        # violation indicators
+        vio1 = [v < 0.9 ? 1 : 0 for v in v1]
+        vio2 = [v < 0.9 ? 1 : 0 for v in v2]
+        vio3 = [v < 0.9 ? 1 : 0 for v in v3]
+
+        if Q_set == Q_sets[1]
+            # low and high y-axis plots
+            p1_low  = plot(v1, color=c_light, linestyle=:dot, linewidth=2, label=L"PF≈0.95",
+                           ylims=(0.85,0.94), xlabel=L"Time step", ylabel=L"Voltage (p.u.)",
+                           xticks=0:96:576, legend=:topright)
+            p1_high = plot(v1, color=c_light, linestyle=:dot, linewidth=2, label=L"PF≈0.95",
+                           ylims=(0.94,1.0), xlabel=L"Time step", ylabel=L"", xticks=0:96:576)
+
+            p2_low  = plot(v2, color=c_light, linestyle=:dot, linewidth=2, label=L"PF≈0.95",
+                           ylims=(0.85,0.94), xlabel=L"Time step", ylabel=L"Voltage (p.u.)",
+                           xticks=0:96:576, legend=:topright)
+            p2_high = plot(v2, color=c_light, linestyle=:dot, linewidth=2, label=L"PF≈0.95",
+                           ylims=(0.94,1.0), xlabel=L"Time step", ylabel=L"", xticks=0:96:576)
+
+            p3_low  = plot(v3, color=c_light, linestyle=:dot, linewidth=2, label=L"PF≈0.95",
+                           ylims=(0.85,0.94), xlabel=L"Time step", ylabel=L"Voltage (p.u.)",
+                           xticks=0:96:576, legend=:topright)
+            p3_high = plot(v3, color=c_light, linestyle=:dot, linewidth=2, label=L"PF≈0.95",
+                           ylims=(0.94,1.0), xlabel=L"Time step", ylabel=L"", xticks=0:96:576)
+
+            # violation bars remain the same
+            p1_sub = plot(vio1, color=:red, fillto=0, fillcolor=:red, alpha=0.7,
+                          yticks=[0,1], ylims=(-0.1,1.1), legend=false, bar_width=1)
+            p2_sub = plot(vio2, color=:red, fillto=0, fillcolor=:red, alpha=0.7,
+                          yticks=[0,1], ylims=(-0.1,1.1), legend=false, bar_width=1)
+            p3_sub = plot(vio3, color=:red, fillto=0, fillcolor=:red, alpha=0.7,
+                          yticks=[0,1], ylims=(-0.1,1.1), legend=false, bar_width=1)
+
+        elseif Q_set == Q_sets[3]
+            # Ground truth
+            plot!(p1_low, v1, color=c_dark, linestyle=:dash, linewidth=3, label=L"Ground truth")
+            plot!(p1_high, v1, color=c_dark, linestyle=:dash, linewidth=3, label=L"Ground truth")
+            plot!(p2_low, v2, color=c_dark, linestyle=:dash, linewidth=3, label=L"Ground truth")
+            plot!(p2_high, v2, color=c_dark, linestyle=:dash, linewidth=3, label=L"Ground truth")
+            plot!(p3_low, v3, color=c_dark, linestyle=:dash, linewidth=3, label=L"Ground truth")
+            plot!(p3_high, v3, color=c_dark, linestyle=:dash, linewidth=3, label=L"Ground truth")
+
+            # Add violation corrections
+            act_vio1 = [v < 0.9 ? 1 : 0 for v in v1]
+            act_vio2 = [v < 0.9 ? 1 : 0 for v in v2]
+            act_vio3 = [v < 0.9 ? 1 : 0 for v in v3]
+            plot!(p1_sub, act_vio1, color=:green, fillto=0, fillcolor=:green, alpha=0.7)
+            plot!(p2_sub, act_vio2, color=:green, fillto=0, fillcolor=:green, alpha=0.7)
+            plot!(p3_sub, act_vio3, color=:green, fillto=0, fillcolor=:green, alpha=0.7)
+
+        else
+            # Best method
+            plot!(p1_low, v1, color=c_mid, linestyle=:solid, markersize=1, markevery=100,
+                  label=L"Best method")
+            plot!(p1_high, v1, color=c_mid, linestyle=:solid, markersize=1, markevery=100,
+                  label=L"Best method")
+            plot!(p2_low, v2, color=c_mid, linestyle=:solid, markersize=1, markevery=100,
+                  label=L"Best method")
+            plot!(p2_high, v2, color=c_mid, linestyle=:solid, markersize=1, markevery=100,
+                  label=L"Best method")
+            plot!(p3_low, v3, color=c_mid, linestyle=:solid, markersize=1, markevery=100,
+                  label=L"Best method")
+            plot!(p3_high, v3, color=c_mid, linestyle=:solid, markersize=1, markevery=100,
+                  label=L"Best method")
+        end
+    end
+
+    # Add threshold lines if needed
+    for Q_set in Q_sets
+        v1 = Result_dict[Q_set][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V1"][range]
+        v2 = Result_dict[Q_set][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V2"][range]
+        v3 = Result_dict[Q_set][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V3"][range]
+
+        if !all(v1 .> 0.9)
+            hline!(p1_low, [0.9], color=:red, label="")
+            hline!(p1_high, [0.9], color=:red, label="")
+        end
+        if !all(v2 .> 0.9)
+            hline!(p2_low, [0.9], color=:red, label="")
+            hline!(p2_high, [0.9], color=:red, label="")
+        end
+        if !all(v3 .> 0.9)
+            hline!(p3_low, [0.9], color=:red, label="")
+            hline!(p3_high, [0.9], color=:red, label="")
+        end
+    end
+
+    # Combine low/high plots and violation bars
+    combined_plot_1 = plot(p1_low, p1_high, p1_sub,
+                           layout=@layout([a{0.45h}; b{0.45h}; c{0.1h}]), size=(900,600))
+    combined_plot_2 = plot(p2_low, p2_high, p2_sub,
+                           layout=@layout([a{0.45h}; b{0.45h}; c{0.1h}]), size=(900,600))
+    combined_plot_3 = plot(p3_low, p3_high, p3_sub,
+                           layout=@layout([a{0.45h}; b{0.45h}; c{0.1h}]), size=(900,600))
+
     display(combined_plot_1)
     display(combined_plot_2)
     display(combined_plot_3)
@@ -380,4 +525,35 @@ function single_plots()
     display(Q1)
 
     println("Max Q load of house 33: $(maximum([t[3] for t in tuples_Q])) kVAr")
+end
+
+function min_max_differences(Result_dict, season, bus, Z_value)
+    range = 2017:2688
+    v1_truth = Result_dict["2"][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V1"][range]
+    v2_truth = Result_dict["2"][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V2"][range]
+    v3_truth = Result_dict["2"][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V3"][range]
+    v1_method = Result_dict["1"][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V1"][range]
+    v2_method = Result_dict["1"][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V2"][range]
+    v3_method = Result_dict["1"][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V3"][range]
+    v1_industry = Result_dict["0"][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V1"][range]
+    v2_industry = Result_dict["0"][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V2"][range]
+    v3_industry = Result_dict["0"][season]["Z=$(Z_value)"]["Busses"]["$(bus)"]["V3"][range]
+    max_diff_method = maximum(abs.(v1_truth .- v1_method))*230
+    min_diff_method = minimum(abs.(v1_truth .- v1_method))*230
+    max_diff_industry = maximum(abs.(v1_truth .- v1_industry))*230
+    min_diff_industry = minimum(abs.(v1_truth .- v1_industry))*230
+    println("Max difference Phase 1 Method: $(max_diff_method), Min difference Phase 1 Method: $(min_diff_method)")
+    println("Max difference Phase 1 Industry: $(max_diff_industry), Min difference Phase 1 Industry: $(min_diff_industry)")
+    max_diff_method = maximum(abs.(v2_truth .- v2_method))*230
+    min_diff_method = minimum(abs.(v2_truth .- v2_method))*230
+    max_diff_industry = maximum(abs.(v2_truth .- v2_industry))*230
+    min_diff_industry = minimum(abs.(v2_truth .- v2_industry))*230
+    println("Max difference Phase 2 Method: $(max_diff_method), Min difference Phase 2 Method: $(min_diff_method)")
+    println("Max difference Phase 2 Industry: $(max_diff_industry), Min difference Phase 2 Industry: $(min_diff_industry)")
+    max_diff_method = maximum(abs.(v3_truth .- v3_method))*230
+    min_diff_method = minimum(abs.(v3_truth .- v3_method))*230
+    max_diff_industry = maximum(abs.(v3_truth .- v3_industry))*230
+    min_diff_industry = minimum(abs.(v3_truth .- v3_industry))*230
+    println("Max difference Phase 3 Method: $(max_diff_method), Min difference Phase 3 Method: $(min_diff_method)")
+    println("Max difference Phase 3 Industry: $(max_diff_industry), Min difference Phase 3 Industry: $(min_diff_industry)")
 end
