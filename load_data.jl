@@ -111,10 +111,10 @@ function add_to_dict!(Result_dict, res,  Q_set, alpha, Z_value, Q_Z, season, mat
         bus_key = string(key)
         bus_dict = get!(alpha_dict["Busses"], bus_key) do
             Dict(
-                "V1" => Float64[sqrt(values["vr"][1]^2 + values["vi"][1]^2)],
-                "V2" => Float64[sqrt(values["vr"][2]^2 + values["vi"][2]^2)],
-                "V3" => Float64[sqrt(values["vr"][3]^2 + values["vi"][3]^2)],
-                "V4" => Float64[sqrt(values["vr"][4]^2 + values["vi"][4]^2)],
+                "V1" => Float64[],
+                "V2" => Float64[],
+                "V3" => Float64[],
+                "V4" => Float64[],
             )
         end
         push!(bus_dict["V1"], sqrt(values["vr"][1]^2 + values["vi"][1]^2))
@@ -125,9 +125,9 @@ function add_to_dict!(Result_dict, res,  Q_set, alpha, Z_value, Q_Z, season, mat
     for (key, values) in res["solution"]["branch"]
         branch_key = string(key)
         branch_dict = get!(alpha_dict["Branches"], branch_key) do
-            Dict("line_loading_P1" => Float64[values["line_loading"][1]],
-                 "line_loading_P2" => Float64[values["line_loading"][2]],
-                 "line_loading_P3" => Float64[values["line_loading"][3]])
+            Dict("line_loading_P1" => Float64[],
+                 "line_loading_P2" => Float64[],
+                 "line_loading_P3" => Float64[])
         end
         push!(branch_dict["line_loading_P1"], values["line_loading"][1])
         push!(branch_dict["line_loading_P2"], values["line_loading"][2])
@@ -137,8 +137,8 @@ function add_to_dict!(Result_dict, res,  Q_set, alpha, Z_value, Q_Z, season, mat
         load_key = string(key)
         load_dict = get!(alpha_dict["Loads"], load_key) do
             Dict(
-                "P$(values["phase_connections"])" => Float64[values["pd"][1]],
-                "Q$(values["phase_connections"])" => Float64[values["qd"][1]]
+                "P$(values["phase_connections"])" => Float64[],
+                "Q$(values["phase_connections"])" => Float64[]
             )
         end
         push!(load_dict["P$(values["phase_connections"])"], values["pd"][1])
@@ -148,12 +148,12 @@ function add_to_dict!(Result_dict, res,  Q_set, alpha, Z_value, Q_Z, season, mat
         gen_key = string(key)
         gen_dict = get!(alpha_dict["Gen"], gen_key) do
             Dict(
-                "P1" => Float64[values["pg"][1]],
-                "P2" => Float64[values["pg"][2]],
-                "P3" => Float64[values["pg"][3]],
-                "Q1" => Float64[values["qg"][1]],
-                "Q2" => Float64[values["qg"][2]],
-                "Q3" => Float64[values["qg"][3]],
+                "P1" => Float64[],
+                "P2" => Float64[],
+                "P3" => Float64[],
+                "Q1" => Float64[],
+                "Q2" => Float64[],
+                "Q3" => Float64[],
             )
         end
         push!(gen_dict["P1"], values["pg"][1])
