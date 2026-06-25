@@ -1,5 +1,5 @@
 This repository contains the scripts (Python and Julia) to recreate the results for the Paper: "Estimation of reactive power loads for low voltage
-network consumers using smart meter data", by Ewout Venstermans, Md. Umar Hashmi, and Marta Vanin.
+network consumers using smart meter data", by Ewout Venstermans, Md. Umar Hashmi, and Marta Vanin. The code is run using a local environment on Python 3.12.4
 
 ## Open source datasets:
 The following open-source datasets (all 15-min resolution) were used during this work:
