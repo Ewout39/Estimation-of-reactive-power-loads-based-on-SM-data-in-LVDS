@@ -36,6 +36,9 @@ https://github.com/Electa-Git/ImpedanceEstimationWithCarson
 
 The original data are licensed under the BSD 3-Clause "New" or "Revised" License.
 
+## Contributors
+Ewout Venstermans: Main developer
+
 
 
 
